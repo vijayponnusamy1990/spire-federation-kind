@@ -86,6 +86,29 @@ Standard Go TLS validation expects the IP address `172.18.x.x` to be in the cert
 
 ---
 
+## 5. SVID Types: X.509 (mTLS) vs. JWT
+
+SPIRE can issue two types of SPIFFE Verifiable Identity Documents (SVIDs). This project exclusively uses **X.509 SVIDs**.
+
+### X.509 SVIDs (Used Here)
+
+- **Mechanism**: Standard X.509 certificates.
+- **Authentication**: Mutual TLS (mTLS).
+- **Use Case**: Best for service-to-service communication where a persistent connection or high-performance handshake is needed.
+- **Why we chose it**:
+  - It provides **encryption** in transit automatically.
+  - It supports **mutual authentication** (both client and server verify each other).
+  - SPIRE handles the rotation of these certificates transparently.
+
+### JWT SVIDs
+
+- **Mechanism**: JSON Web Tokens.
+- **Authentication**: Bearer tokens in HTTP headers (e.g., `Authorization: Bearer <token>`).
+- **Use Case**: Best for authenticating with services that don't support mTLS (like some Cloud APIs) or for passing identity through multiple architectural layers (like a frontend to a legacy backend).
+- **Limitation**: Unlike X.509, JWTs do not provide transport-layer encryption on their own; they must be sent over an existing secure channel (like standard TLS).
+
+---
+
 ## 5. Troubleshooting the State
 
 ### Persistent Data Pitfall

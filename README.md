@@ -128,6 +128,14 @@ kubectl apply -f helm/client.yaml --kubeconfig $cluster2
   # Now re-deploy from Step 4
   ```
 
+## Teardown
+
+To remove all resources created during this demo (including kind clusters and local kubeconfig files), run the teardown script:
+
+```bash
+./4-teardown.sh
+```
+
 ## Verification
 
 Port-forward the client pod to your localhost:

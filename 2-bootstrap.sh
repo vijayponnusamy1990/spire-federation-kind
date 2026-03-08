@@ -19,14 +19,14 @@ function bootstrap_spire_federation() {
         -n spire "${fed1_spire_pod_name}" \
         -c "${fed1_spire_container_name}" -- \
             bin/spire-server bundle show \
-            -registrationUDSPath ../../run/spire/sockets/registration.sock \
+            -socketPath /tmp/spire-server/private/api.sock \
             -format spiffe | \
                 kubectl exec -i \
                     --kubeconfig ${fed2} \
                     -n spire "${fed2_spire_pod_name}" \
                     -c "${fed2_spire_container_name}" -- \
                         bin/spire-server bundle set \
-                        -registrationUDSPath ../../run/spire/sockets/registration.sock \
+                        -socketPath /tmp/spire-server/private/api.sock \
                         -format spiffe \
                         -id "spiffe://${trust_domain}"
 

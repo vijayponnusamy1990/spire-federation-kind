@@ -2,47 +2,37 @@
 
 [![Release Actions status](https://github.com/nishantapatil3/spire-federation-kind/workflows/Release/badge.svg)](https://github.com/nishantapatil3/spire-federation-kind/actions/workflows/release.yml)
 
-> **Note:** Check out this Cisco Blog for Intro on: [SPIFFE/SPIRE Federation on Kind clusters](https://outshift.cisco.com/blog/spire-federation-kind)
+> [!NOTE]
+> Check out this Cisco Blog for an Intro on: [SPIFFE/SPIRE Federation on Kind clusters](https://outshift.cisco.com/blog/spire-federation-kind)
 
-Spire Federation provides zero trust security of workloads in kubernetes clusters and is wide adopted by cloud service
-providers.
+Spire Federation provides zero-trust security for workloads in Kubernetes clusters and is widely adopted by cloud service providers.
 
-In this example we will create two kind clusters and set them up with trust domains `cluster1.com` and `cluster2.com`
+In this example, we will create two kind clusters and set them up with trust domains `cluster1.com` and `cluster2.com`.
 
-Then we will use the examples provided in spire official example and modify the docker container to be suitable
-for kubernetes deployment.
+## Federation Example
 
-Source: [Spire federation example](https://github.com/spiffe/spire-tutorials/tree/master/docker-compose/federation)
+### Requirements
 
-The above example is based on docker-compose and federation between two docker containers. But this repo is an enhancement
-the official example to bring spiffe/spire security for kubernetes clusters.
-
-# Federation Example
-
-## Requirements
-
-Required files for this tutorial can be found in the `docker-compose/federation` directory in https://github.com/spiffe/spire-tutorials. If you didn't already clone the repository please do so now.
-
-Before proceeding, review the following system requirements:
 - A 64-bit Linux or macOS environment
-- [kind](https://kind.sigs.k8s.io/) to deploy kubernetes clusters and [kubectl](https://kubernetes.io/docs/tasks/tools/) to execute commands on deployments
-- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed (Docker Compose is included in macOS Docker Desktop)
-- [helm](https://helm.sh/) charts - to manage Kubernetes applications
-- [Go](https://golang.org/dl/) 1.14.4 or higher installed
+- [kind](https://kind.sigs.k8s.io/) to deploy Kubernetes clusters
+- [kubectl](https://kubernetes.io/docs/tasks/tools/) to execute commands
+- [Docker](https://docs.docker.com/get-docker/) installed
+- [helm](https://helm.sh/) charts to manage applications
+- [Go](https://golang.org/dl/) 1.14.4 or higher
 
-## Build
+### 1. Build and Prepare Images
 
-**Note:** There are some known issues with Mac's Docker networking and kind clusters's metallb networking being incompatible, so this article is written for `linux/amd64` platform and Docker images are built for `linux/amd64` by default.
-
-Ensure that the current working directory is spire-federation-kind and run the following command to build
-
-Optionally: push containers to your cloud repository.
+Build the Docker images for the broker and quotes service, then load them into the kind clusters.
 
 ```bash
-$ ./build.sh
+./1-build.sh
+# Load images into kind nodes (required for local development)
+kind load docker-image ghcr.io/nishantapatil3/broker-webapp:latest --name kind-2
+kind load docker-image ghcr.io/nishantapatil3/stock-quotes-service:latest --name kind-1
 ```
 
-Create two kind clusters
+### 2. Create Clusters
+
 ```bash
 kind create cluster --name kind-1
 kind create cluster --name kind-2
@@ -50,18 +40,18 @@ kind create cluster --name kind-2
 mkdir -p $PWD/kubeconfigs
 kind get kubeconfig --name=kind-1 > $PWD/kubeconfigs/kind-1.kubeconfig
 kind get kubeconfig --name=kind-2 > $PWD/kubeconfigs/kind-2.kubeconfig
-```
 
-Add $cluster1 and $cluster2 to your env
-```
+# Load cluster identifiers into your environment
 source lab_clusters.sh
 ```
 
-Wait until the clusters deploy on your setup, then deploy metallb for load balancing such that two clusters
-can reach each other by their external IP's
+### 3. Deploy MetalLB (Networking)
 
-> **Note:** `172.17.*` address might be different on your docker network for kind, check that and replace with your IPAM address in below metallb and spire config.
-Check `docker network inspect kind` on your device
+MetalLB allows the two clusters to reach each other via External IPs on the Docker bridge network.
+
+> [!IMPORTANT]
+> By default, `kind` typically uses the `172.18.0.0/16` subnet. Check yours with `docker network inspect kind`.
+> If your subnet is different, update the IP ranges in `helm/metallb-system/ipaddresspool*.yaml` before applying.
 
 ```bash
 helm repo add metallb https://metallb.github.io/metallb
@@ -75,52 +65,77 @@ kubectl create ns metallb-system
 helm install metallb metallb/metallb --namespace metallb-system
 unset KUBECONFIG
 
+# Apply IP pools (Adjust IPs in these files if your kind subnet isn't 172.18.x.x)
 kubectl apply -f helm/metallb-system/ipaddresspool1.yaml --kubeconfig $cluster1
 kubectl apply -f helm/metallb-system/ipaddresspool2.yaml --kubeconfig $cluster2
 ```
 
-Deploy spire server and agent
+### 4. Deploy SPIRE Infrastructure
+
+Deploy the SPIRE server and agent. Replace the `address` fields below with your actual MetalLB LoadBalancer IPs if they differ from the defaults.
+
 ```bash
-helm template helm/spire --set trustDomain=cluster1.com --set federatesWith[0].trustDomain=cluster2.com --set federatesWith[0].address=172.17.254.1 --set federatesWith[0].port=8443 | kubectl apply --kubeconfig $cluster1 -f -
-helm template helm/spire --set trustDomain=cluster2.com --set federatesWith[0].trustDomain=cluster1.com --set federatesWith[0].address=172.17.255.1 --set federatesWith[0].port=8443 | kubectl apply --kubeconfig $cluster2 -f -
+# Deploy to Cluster 1
+helm template helm/spire --set trustDomain=cluster1.com \
+  --set "federatesWith[0].trustDomain=cluster2.com" \
+  --set "federatesWith[0].address=172.18.254.1" \
+  --set "federatesWith[0].port=8443" | kubectl apply --kubeconfig $cluster1 -f -
+
+# Deploy to Cluster 2
+helm template helm/spire --set trustDomain=cluster2.com \
+  --set "federatesWith[0].trustDomain=cluster1.com" \
+  --set "federatesWith[0].address=172.18.255.1" \
+  --set "federatesWith[0].port=8443" | kubectl apply --kubeconfig $cluster2 -f -
 ```
 
-> **Note:** if using zsh append `noglob` before `helm command`
+### 5. Bootstrap and Register
 
-Run the following command to [bootstrap the federation](https://github.com/spiffe/spire-tutorials/blob/master/docker-compose/federation/README.md#bootstrap-federation):
+Exchange trust bundles between clusters and register the workloads.
+
 ```bash
 ./2-bootstrap.sh
-```
-
-Run the following command to create [workload registration entries](https://github.com/spiffe/spire-tutorials/blob/master/docker-compose/federation/README.md#create-registration-entries-for-federation):
-```bash
 ./3-register.sh
 ```
 
-Deploy Server
-```bigquery
-kubectl apply -f helm/server.yaml --kubeconfig $cluster1
-```
-Deploy client
+### 6. Deploy Workloads
 
-> Note: Update this field in client.yaml after checking the correct IP address of server (this may change based on your MetalLB config)
-```
-env:
-- name: QUOTES_SERVICE_HOST
-    value: "172.17.254.2" # Update this IP with stock-quotes-service external IP address
-```
-```
+Apply the server (Cluster 1) and client (Cluster 2).
+
+```bash
+# Cluster 1: Backend
+kubectl apply -f helm/server.yaml --kubeconfig $cluster1
+
+# Cluster 2: Frontend
+# Note: Ensure QUOTES_SERVICE_HOST in helm/client.yaml matches the backend External IP (172.18.255.2)
 kubectl apply -f helm/client.yaml --kubeconfig $cluster2
 ```
 
-## See the Scenario Working In a Browser
+## Troubleshooting & Reset
 
-Port forward the client pod to your localhost:8080 using kubectl
+### Page Keeps Loading / "Quotes service unavailable"
 
-Example:
-`kubectl port-forward broker-webapp-85574f4585-cxvxg 8080:8080 --kubeconfig $cluster2`
+- **Verify IPs:** Check `kubectl get svc -A` in both clusters. Ensure the `EXTERNAL-IP` matches what you configured in `helm/spire` and `helm/client.yaml`.
+- **SPIFFE Identities:** If pods can't fetch SVIDs, check logs: `kubectl logs -l app=broker-webapp --kubeconfig $cluster2`.
+- **Hard Reset:** If identities are out of sync (e.g., after a node restart), run this to wipe the cached SPIRE state:
 
-Open up a browser to http://localhost:8080/quotes and you should see a grid of randomly generated phony stock quotes that are updated every 1 second.
+  ```bash
+  # Delete SPIRE components
+  kubectl delete statefulset spire-server -n spire --kubeconfig $cluster1
+  kubectl delete statefulset spire-server -n spire --kubeconfig $cluster2
+  # Clear host-path data on the kind nodes
+  docker exec kind-1-control-plane rm -rf /var/spire-data /run/spire/sockets
+  docker exec kind-2-control-plane rm -rf /var/spire-data /run/spire/sockets
+  # Now re-deploy from Step 4
+  ```
 
-![k9s-view](./images/k9s-view.png)
+## Verification
+
+Port-forward the client pod to your localhost:
+
+```bash
+kubectl port-forward svc/broker-webapp 8080:8080 --kubeconfig $cluster2
+```
+
+Open [http://localhost:8080/quotes](http://localhost:8080/quotes). You should see a live grid of stock quotes securely fetched cross-cluster via federated SPIFFE identities.
+
 ![stockbroker-webpage](./images/stockbroker-webpage.png)

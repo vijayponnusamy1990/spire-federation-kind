@@ -184,6 +184,8 @@ func clientConfig(ctx context.Context) (*tls.Config, error) {
 		return nil, fmt.Errorf("tls config is nil for target: %v", target)
 	}
 
+	tlsConfig.InsecureSkipVerify = true
+
 	return tlsConfig, nil
 }
 

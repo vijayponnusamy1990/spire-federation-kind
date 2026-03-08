@@ -17,8 +17,7 @@ data:
       trust_domain = "{{ .Values.trustDomain }}"
       data_dir = "/run/spire/data"
       log_level = "DEBUG"
-      default_svid_ttl = "1h"
-      registration_uds_path = "/run/spire/sockets/registration.sock"
+
       ca_subject = {
         country = ["US"],
         organization = ["SPIFFE"],
@@ -28,12 +27,13 @@ data:
         bundle_endpoint {
           address = "0.0.0.0"
           port = 8443
+          profile "https_spiffe" {}
         }
         {{- range .Values.federatesWith }}
         federates_with "{{ .trustDomain }}" {
-          bundle_endpoint {
-            address = "{{ .address }}"
-            port = "{{ .port }}"
+          bundle_endpoint_url = "https://{{ .address }}:{{ .port }}"
+          bundle_endpoint_profile "https_spiffe" {
+            endpoint_spiffe_id = "spiffe://{{ .trustDomain }}/spire/server"
           }
         }
         {{- end }}
@@ -52,14 +52,12 @@ data:
             # NOTE: Change this to your cluster name
             "kubernetes" = {
               use_token_review_api_validation = true
-              service_account_whitelist = ["{{ .Values.namespace }}:spire-agent"]
+              service_account_allow_list = ["{{ .Values.namespace }}:spire-agent"]
             }
           }
         }
       }
-      NodeResolver "noop" {
-        plugin_data {}
-      }
+
       KeyManager "disk" {
         plugin_data {
           keys_path = "/run/spire/data/keys.json"

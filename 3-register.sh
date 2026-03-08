@@ -13,14 +13,25 @@ function register_spire_entry() {
     local federates_with_arg=$1; shift
 
     echo "-------------------------"
+    echo "Registering node alias for ${spire_agent}"
+
+    # Get the actual dynamically generated k8s_sat Agent SPIFFE ID
+    local agent_id=$(kubectl exec -it --kubeconfig ${kind_config} \
+       -n spire "${spire_server}-0" \
+       -c "${spire_server}" \
+       -- bin/spire-server agent list -socketPath /tmp/spire-server/private/api.sock \
+       | grep "SPIFFE ID" | head -n 1 | awk '{print $4}' | tr -d '\r')
+
+    echo "Found agent ID: ${agent_id}"
+
     echo "Registering workload: ${workload_name}"
     kubectl exec -it --kubeconfig ${kind_config} \
        -n spire "${spire_server}-0" \
        -c "${spire_server}" \
        -- bin/spire-server entry create \
-           -registrationUDSPath ../../run/spire/sockets/registration.sock \
+           -socketPath /tmp/spire-server/private/api.sock \
            -spiffeID "spiffe://${trust_domain}/${workload_name}" \
-           -parentID "spiffe://${trust_domain}/${spire_agent}" \
+           -parentID "${agent_id}" \
            -selector "k8s:sa:${workload_name}-service-account" \
            ${federates_with_arg}
     echo "-------------------------"

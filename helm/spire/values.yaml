@@ -25,3 +25,7 @@ trustDomain: central.com
 #       address: "172.17.253.1"
 #       port: 8443
 ############
+federatesWith:
+  - trustDomain: "member1.com"
+    address: "172.17.254.1"
+    port: 8443

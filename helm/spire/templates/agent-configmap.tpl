@@ -27,11 +27,7 @@ data:
       }
       WorkloadAttestor "k8s" {
         plugin_data {
-          {{- if .Values.azure }}
-          kubelet_read_only_port = 10255
-          {{- else }}
           skip_kubelet_verification = true
-          {{- end }}
         }
       }
     }

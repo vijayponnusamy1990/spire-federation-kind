@@ -47,12 +47,12 @@ spec:
           resources:
             requests:
               cpu: "100m"
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           env:
             - name: QUOTES_SERVICE_HOST
-              value: "172.17.254.2" # Update this IP with stock-quotes-service external IP address
+              value: "172.18.255.2" # Update this IP with stock-quotes-service external IP address
           volumeMounts:
             - mountPath: /run/spire/sockets
               name: spire-agent-socket

@@ -110,6 +110,37 @@ kubectl apply -f helm/server.yaml --kubeconfig $cluster1
 kubectl apply -f helm/client.yaml --kubeconfig $cluster2
 ```
 
+## Hub-Spoke Federation (Advanced)
+
+This project supports a Hub-Spoke model where a central VM-based Hub (simulated via Docker) manages the trust between clusters.
+
+### 1. Start the Hub
+
+```bash
+./hub/start-hub.sh
+```
+
+### 2. Re-deploy Spokes
+
+```bash
+# This will re-apply helm with hub_ip overrides
+source lab_clusters.sh
+helm template helm/spire --set trustDomain=cluster1.com --set "federatesWith[0].trustDomain=hub.com" --set "federatesWith[0].address=$hub_ip" --set "federatesWith[0].port=8443" | kubectl apply --kubeconfig $cluster1 -f -
+helm template helm/spire --set trustDomain=cluster2.com --set "federatesWith[0].trustDomain=hub.com" --set "federatesWith[0].address=$hub_ip" --set "federatesWith[0].port=8443" | kubectl apply --kubeconfig $cluster2 -f -
+```
+
+### 3. Bootstrap 3-Way Trust
+
+```bash
+./5-hub-bootstrap.sh
+```
+
+### 4. Register Workloads
+
+```bash
+./3-register.sh
+```
+
 ## Troubleshooting & Reset
 
 ### Page Keeps Loading / "Quotes service unavailable"

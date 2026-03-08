@@ -97,3 +97,22 @@ SPIRE Server and Agent use `hostPath` volumes for data storage. If you delete a 
 ```bash
 docker exec <node-name> rm -rf /var/spire-data /run/spire/sockets
 ```
+
+---
+
+## 6. Hub-Spoke Architecture Extension
+
+This demo supports an advanced Hub-Spoke model where a central SPIRE Server (simulated as a Docker container on the `kind` network) acts as a high-level trust anchor.
+
+### Components
+
+- **Hub**: `hub.com` (Docker container IP 172.18.0.x).
+- **Spokes**: `cluster1.com` and `cluster2.com`.
+
+### Federation Mesh
+
+In this model, spokes federate with the Hub, and the Hub federates with all spokes. This creates a centralized trust graph that can be extended to hundreds of clusters or VMs.
+
+### MTLS in Hub-Spoke
+
+Even with a central Hub, workloads in different spokes still perform direct MTLS. Since they are federated with the Hub, they can also trust identities issued by the Hub (e.g., a "control-plane" service running in the HUB VM).

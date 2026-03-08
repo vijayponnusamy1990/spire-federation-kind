@@ -37,5 +37,5 @@ function register_spire_entry() {
     echo "-------------------------"
 }
 
-register_spire_entry $cluster1 "spire-server" "spire-agent" "server" "cluster1.com" "-federatesWith spiffe://cluster2.com"
-register_spire_entry $cluster2 "spire-server" "spire-agent" "client" "cluster2.com" "-federatesWith spiffe://cluster1.com"
+register_spire_entry $cluster1 "spire-server" "spire-agent" "server" "cluster1.com" "-federatesWith cluster2.com -federatesWith hub.com"
+register_spire_entry $cluster2 "spire-server" "spire-agent" "client" "cluster2.com" "-federatesWith cluster1.com -federatesWith hub.com"

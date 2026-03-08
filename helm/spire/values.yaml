@@ -26,6 +26,6 @@ trustDomain: central.com
 #       port: 8443
 ############
 federatesWith:
-  - trustDomain: "member1.com"
-    address: "172.17.254.1"
+  - trustDomain: "hub.com"
+    address: "172.18.0.4"
     port: 8443
